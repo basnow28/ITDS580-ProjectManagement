@@ -1,5 +1,5 @@
 const Habit = require("../model/Habit");
-const { createHabit } = require("../controller/habitController");
+const { createHabit, getUserHabits } = require("../controller/habitController");
 
 jest.mock("../model/Habit");
 
@@ -60,6 +60,114 @@ describe("createHabit", () => {
     Habit.mockImplementation(() => ({ save: jest.fn().mockRejectedValue(error) }));
 
     await createHabit(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(error);
+  });
+});
+
+describe("getUserHabits", () => {
+  let req, res, next;
+
+  beforeEach(() => {
+    req = { userId: "mockUserId" }; // Mock user ID
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+    next = jest.fn();
+  });
+
+  it("should return habits with active and future flags", async () => {
+    const today = new Date();
+    const pastDate = new Date();
+    pastDate.setDate(today.getDate() - 40); // Expired habit (40 days ago)
+    const futureDate = new Date();
+    futureDate.setDate(today.getDate() + 10); // Future habit (in 10 days)
+
+    const mockHabits = [
+      {
+        _id: "1",
+        name: "Morning Run",
+        startDate: today,
+        duration: 33,
+        userId: "mockUserId",
+        participants: [],
+        workedDays: [],
+        timeOfWorkingOnTheHabit: "6am",
+        toObject: jest.fn().mockReturnValue({
+          _id: "1",
+          name: "Morning Run",
+          startDate: today,
+          duration: 33,
+          userId: "mockUserId",
+          participants: [],
+          workedDays: [],
+          timeOfWorkingOnTheHabit: "6am",
+        }),
+      },
+      {
+        _id: "2",
+        name: "Reading",
+        startDate: pastDate,
+        duration: 33,
+        userId: "mockUserId",
+        participants: [],
+        workedDays: [],
+        timeOfWorkingOnTheHabit: "9pm",
+        toObject: jest.fn().mockReturnValue({
+          _id: "2",
+          name: "Reading",
+          startDate: pastDate,
+          duration: 33,
+          userId: "mockUserId",
+          participants: [],
+          workedDays: [],
+          timeOfWorkingOnTheHabit: "9pm",
+        }),
+      },
+      {
+        _id: "3",
+        name: "Meditation",
+        startDate: futureDate,
+        duration: 33,
+        userId: "mockUserId",
+        participants: [],
+        workedDays: [],
+        timeOfWorkingOnTheHabit: "7am",
+        toObject: jest.fn().mockReturnValue({
+          _id: "3",
+          name: "Meditation",
+          startDate: futureDate,
+          duration: 33,
+          userId: "mockUserId",
+          participants: [],
+          workedDays: [],
+          timeOfWorkingOnTheHabit: "7am",
+        }),
+      },
+    ];
+
+    // Mock Habit.find() to return the test habits
+    Habit.find = jest.fn().mockResolvedValue(mockHabits);
+
+    await getUserHabits(req, res, next);
+
+    expect(Habit.find).toHaveBeenCalledWith({ userId: "mockUserId" });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      habits: expect.arrayContaining([
+        expect.objectContaining({ name: "Morning Run", active: true, future: false }),
+        expect.objectContaining({ name: "Reading", active: false, future: false }),
+        expect.objectContaining({ name: "Meditation", active: false, future: true }),
+      ]),
+    });
+  });
+
+  it("should call next() with an error if Habit.find() fails", async () => {
+    const error = new Error("Database error");
+    Habit.find = jest.fn().mockRejectedValue(error);
+
+    await getUserHabits(req, res, next);
 
     expect(next).toHaveBeenCalledWith(error);
   });
