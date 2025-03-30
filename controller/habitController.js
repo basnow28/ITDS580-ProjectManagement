@@ -32,3 +32,32 @@ exports.createHabit = async (req, res, next) => {
     next(error);
   }
 }
+
+exports.getUserHabits = async (req, res, next) => {
+  try {
+    const userId = req.userId; // Assuming authentication middleware sets req.userId
+    const today = new Date();
+
+    // Fetch all habits for the user
+    const userHabits = await Habit.find({ userId });
+
+    // Add `active` flag based on whether the habit is still within its 33-day duration
+    // Add `future`flag based on whether the habit hasn't started yet
+    const formattedHabits = [];
+    userHabits.forEach((habit) => {
+      const habitStartDate = new Date(habit.startDate);
+      const habitEndDate = new Date(habit.startDate);
+      habitEndDate.setDate(habitEndDate.getDate() + habit.duration); // Adding 33 days
+
+      formattedHabits.push({
+        ...habit.toObject(),
+        active: today >= habitStartDate && today < habitEndDate, // true if still within 33-day period
+        future: today < habitStartDate // true if the habit start date is a future day
+      });
+    });
+
+    res.status(200).json({ habits: formattedHabits });
+  } catch (error) {
+    next(error);
+  }
+};
