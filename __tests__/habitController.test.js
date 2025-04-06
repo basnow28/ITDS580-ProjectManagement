@@ -1,5 +1,5 @@
 const Habit = require("../model/Habit");
-const { createHabit, getUserHabits } = require("../controller/habitController");
+const { createHabit, getUserHabits, updateHabitDayCompletion } = require("../controller/habitController");
 
 jest.mock("../model/Habit");
 
@@ -24,12 +24,16 @@ describe("createHabit", () => {
   });
 
   it("should create a new habit and return 201 status", async () => {
+    const workedDays = Array.from({ length: 33 }, (_, i) => ({
+      dayNumber: i + 1,
+      completed: false,
+    }));
+    console.log(workedDays)
     const mockHabit = {
       save: jest.fn().mockResolvedValue(true),
       ...req.body,
       userId: req.userId,
       participants: [],
-      workedDays: [],
       duration: 33
     };
 
@@ -44,7 +48,7 @@ describe("createHabit", () => {
       timeOfWorkingOnTheHabit: "18:00",
       userId: "user123",
       participants: [],
-      workedDays: [],
+      workedDays,
       duration: 33
     });
     expect(mockHabit.save).toHaveBeenCalled();
@@ -168,6 +172,84 @@ describe("getUserHabits", () => {
     Habit.find = jest.fn().mockRejectedValue(error);
 
     await getUserHabits(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(error);
+  });
+});
+
+describe("updateHabitDayCompletion", () => {
+  let req, res, next;
+
+  beforeEach(() => {
+    req = {
+      params: {
+        habitId: "mockHabitId",
+        dayNumber: "2",
+      },
+      body: {
+        completed: true,
+      },
+    };
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+    next = jest.fn();
+  });
+
+  it("should update an existing day in workedDays", async () => {
+    const mockHabit = {
+      _id: "mockHabitId",
+      workedDays: [{ dayNumber: 2, completed: false }],
+      save: jest.fn(),
+    };
+
+    Habit.findById = jest.fn().mockResolvedValue(mockHabit);
+
+    await updateHabitDayCompletion(req, res, next);
+
+    expect(mockHabit.workedDays[0].completed).toBe(true);
+    expect(mockHabit.save).toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "Habit updated successfully",
+      habit: mockHabit,
+    });
+  });
+
+  it("should add a new day to workedDays if it does not exist", async () => {
+    const mockHabit = {
+      _id: "mockHabitId",
+      workedDays: [{ dayNumber: 1, completed: true }],
+      save: jest.fn(),
+    };
+
+    Habit.findById = jest.fn().mockResolvedValue(mockHabit);
+
+    await updateHabitDayCompletion(req, res, next);
+
+    expect(mockHabit.workedDays).toContainEqual({
+      dayNumber: 2,
+      completed: true,
+    });
+    expect(mockHabit.save).toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("should return 404 if habit is not found", async () => {
+    Habit.findById = jest.fn().mockResolvedValue(null);
+
+    await updateHabitDayCompletion(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ message: "Habit not found" });
+  });
+
+  it("should call next with error if something goes wrong", async () => {
+    const error = new Error("Something went wrong");
+    Habit.findById = jest.fn().mockRejectedValue(error);
+
+    await updateHabitDayCompletion(req, res, next);
 
     expect(next).toHaveBeenCalledWith(error);
   });

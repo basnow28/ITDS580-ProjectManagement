@@ -10,6 +10,12 @@ exports.createHabit = async (req, res, next) => {
   try {
     const { name, dailyDuration, startDate, timeOfWorkingOnTheHabit } = req.body;
     const userId = req.userId;
+    const duration = 33;
+
+    const workedDays = Array.from({ length: duration }, (_, i) => ({
+      dayNumber: i + 1,
+      completed: false,
+    }));
 
     const newHabit = new Habit({
       name,
@@ -17,9 +23,9 @@ exports.createHabit = async (req, res, next) => {
       dailyDuration,
       startDate,
       timeOfWorkingOnTheHabit,
-      participants: [],
-      workedDays: [],
-      duration: 33
+      workedDays,
+      duration,
+      participants: []
     });
 
     await newHabit.save();
@@ -57,6 +63,45 @@ exports.getUserHabits = async (req, res, next) => {
     });
 
     res.status(200).json({ habits: formattedHabits });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.updateHabitDayCompletion = async (req, res, next) => {
+  try {
+    const { habitId, dayNumber } = req.params;
+    const { completed } = req.body;
+
+    const habit = await Habit.findById(habitId);
+    if (!habit) return res.status(404).json({ message: "Habit not found" });
+
+    if (!Array.isArray(habit.workedDays)) {
+      habit.workedDays = Array.from({ length: habit.duration }, (_, i) => ({
+        dayNumber: i + 1,
+        completed: false,
+      }));
+    }
+
+    const dayIndex = habit.workedDays.findIndex(
+      (day) => day.dayNumber === Number(dayNumber)
+    );
+
+    if (dayIndex !== -1) {
+      habit.workedDays[dayIndex].completed = completed;
+    } else {
+      habit.workedDays.push({
+        dayNumber: Number(dayNumber),
+        completed,
+      });
+    }
+
+    await habit.save();
+
+    res.status(200).json({
+      message: "Habit updated successfully",
+      habit,
+    });
   } catch (error) {
     next(error);
   }
