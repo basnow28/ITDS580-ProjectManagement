@@ -28,7 +28,6 @@ describe("createHabit", () => {
       dayNumber: i + 1,
       completed: false,
     }));
-    console.log(workedDays)
     const mockHabit = {
       save: jest.fn().mockResolvedValue(true),
       ...req.body,
