@@ -1,6 +1,6 @@
 const mongoose = require("mongoose")
 
-const Habit = new mongoose.Schema({
+const HabitSchema = new mongoose.Schema({
   name: String,
   userId: String,
   dailyDuration: String,
@@ -11,4 +11,4 @@ const Habit = new mongoose.Schema({
   participants: Array,
 })
 
-module.exports = mongoose.model('Habit', Habit);
+module.exports = mongoose.model('Habit', HabitSchema);
