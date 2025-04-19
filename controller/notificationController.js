@@ -14,3 +14,25 @@ exports.getUserNotifications = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.markNotificationAsRead = async (req, res, next) => {
+  try {
+    const { notificationId } = req.params;
+    const updatedNotification = await Notification.findByIdAndUpdate(
+      notificationId,
+      { read: true },
+      { new: true }
+    );
+
+    if (!updatedNotification) {
+      return res.status(404).json({ message: "Notification not found" });
+    }
+
+    res.status(200).json({
+      message: "Notification marked as read",
+      notification: updatedNotification,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
