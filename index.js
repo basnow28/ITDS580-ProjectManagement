@@ -4,6 +4,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 
 const habitRoutes = require('./routes/habitRoutes');
+const notificationRoutes = require("./routes/notificationRoutes");
 const authorizeMiddleware = require('./auth/authMiddleware');
 
 const app = express();
@@ -22,5 +23,6 @@ app.use(express.json());
 app.use(authorizeMiddleware);
 
 app.use("/api/habits", habitRoutes)
+app.use("/api/notifications", notificationRoutes);
 
 app.listen(8080, () => console.log("listening on port 8080"));
