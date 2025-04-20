@@ -1,4 +1,5 @@
 const Habit = require("../model/Habit");
+const Notification = require("../model/Notification");
 
 exports.ok = async (req, res, next) => {
   res.status(200).json({
@@ -41,11 +42,16 @@ exports.createHabit = async (req, res, next) => {
 
 exports.getUserHabits = async (req, res, next) => {
   try {
-    const userId = req.userId; // Assuming authentication middleware sets req.userId
+    const userId = req.userId;
     const today = new Date();
 
-    // Fetch all habits for the user
-    const userHabits = await Habit.find({ userId });
+    // Fetch all habits for the user - as creator or participant
+    const userHabits = await Habit.find({
+      $or: [
+        { userId }, // creator
+        { participants: userId } // shared with
+      ]
+    });
 
     // Add `active` flag based on whether the habit is still within its 33-day duration
     // Add `future`flag based on whether the habit hasn't started yet
@@ -102,6 +108,41 @@ exports.updateHabitDayCompletion = async (req, res, next) => {
       message: "Habit updated successfully",
       habit,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.inviteUserToHabit = async (req, res, next) => {
+  try {
+    const { habitId } = req.params;
+    const { invitedUserId } = req.body;
+    const habit = await Habit.findById(habitId);
+
+    if (!habit) {
+      return res.status(404).json({ message: "Habit not found" });
+    }
+
+    // Prevent duplicates
+    if (
+      habit.participants.includes(invitedUserId) ||
+      habit.pendingInvites.includes(invitedUserId)
+    ) {
+      return res.status(400).json({ message: "User already invited or participating" });
+    }
+
+    habit.pendingInvites.push(invitedUserId);
+    await habit.save();
+
+    // Create a notification
+    const notification = new Notification({
+      userId: invitedUserId,
+      message: `You've been invited to join the habit: ${habit.name}`,
+      type: "INVITE"
+    });
+    await notification.save();
+
+    res.status(200).json({ message: "User invited successfully" });
   } catch (error) {
     next(error);
   }

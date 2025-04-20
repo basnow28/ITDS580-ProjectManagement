@@ -1,7 +1,9 @@
 const Habit = require("../model/Habit");
-const { createHabit, getUserHabits, updateHabitDayCompletion } = require("../controller/habitController");
+const Notification = require("../model/Notification");
+const { createHabit, getUserHabits, updateHabitDayCompletion, inviteUserToHabit } = require("../controller/habitController");
 
 jest.mock("../model/Habit");
+jest.mock("../model/Notification");
 
 describe("createHabit", () => {
   let req, res, next;
@@ -155,7 +157,15 @@ describe("getUserHabits", () => {
 
     await getUserHabits(req, res, next);
 
-    expect(Habit.find).toHaveBeenCalledWith({ userId: "mockUserId" });
+    expect(Habit.find).toHaveBeenCalledWith({
+      "$or": [
+        {
+          userId: "mockUserId",
+        },
+        {
+          participants: "mockUserId",
+        }]
+    });
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
       habits: expect.arrayContaining([
@@ -249,6 +259,95 @@ describe("updateHabitDayCompletion", () => {
     Habit.findById = jest.fn().mockRejectedValue(error);
 
     await updateHabitDayCompletion(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(error);
+  });
+});
+
+describe("inviteUserToHabit", () => {
+  let req, res, next;
+
+  beforeEach(() => {
+    req = {
+      params: { habitId: "habit123" },
+      body: { invitedUserId: "user456" },
+    };
+
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+
+    next = jest.fn();
+  });
+
+  it("should return 404 if habit not found", async () => {
+    Habit.findById.mockResolvedValue(null);
+
+    await inviteUserToHabit(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ message: "Habit not found" });
+  });
+
+  it("should return 400 if user is already a participant", async () => {
+    Habit.findById.mockResolvedValue({
+      participants: ["user456"],
+      pendingInvites: [],
+    });
+
+    await inviteUserToHabit(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "User already invited or participating",
+    });
+  });
+
+  it("should return 400 if user was already invited", async () => {
+    Habit.findById.mockResolvedValue({
+      participants: [],
+      pendingInvites: ["user456"],
+    });
+
+    await inviteUserToHabit(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "User already invited or participating",
+    });
+  });
+
+  it("should add user to pendingInvites and send a notification", async () => {
+    const mockSave = jest.fn();
+    Habit.findById.mockResolvedValue({
+      _id: "habit123",
+      name: "Morning Run",
+      participants: [],
+      pendingInvites: [],
+      save: mockSave,
+    });
+
+    const mockNotificationSave = jest.fn();
+    Notification.mockImplementation(() => ({
+      save: mockNotificationSave,
+    }));
+
+    await inviteUserToHabit(req, res, next);
+
+    expect(mockSave).toHaveBeenCalled();
+    expect(mockNotificationSave).toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "User invited successfully",
+    });
+  });
+
+  it("should call next with error if something goes wrong", async () => {
+    const error = new Error("DB error");
+    Habit.findById.mockRejectedValue(error);
+
+    await inviteUserToHabit(req, res, next);
 
     expect(next).toHaveBeenCalledWith(error);
   });

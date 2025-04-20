@@ -6,9 +6,10 @@ const HabitSchema = new mongoose.Schema({
   dailyDuration: String,
   startDate: Date,
   timeOfWorkingOnTheHabit: String,
-  workedDays: Array, //Array representing the indexes of the days the user worked on the habit
+  workedDays: Array,
   duration: Number,
   participants: Array,
+  pendingInvites: Array,
 })
 
 module.exports = mongoose.model('Habit', HabitSchema);
